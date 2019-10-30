@@ -3,35 +3,34 @@
 #### 介绍
 飞马接口封装
 
-#### 软件架构
-软件架构说明
+## 环境需求
+* VS2017
+* python 3.7+
 
+## 使用说明
+* ~~运行 `pyton generate\\run.py` 生成所有文件~~ 
+* 不要运行,手动修改部分太多. 不要运行,手动修改部分太多. 不要运行,手动修改部分太多.
+* C++编译
+    * Windows
+        * 环境要求 `vs2017`
+        * 设置项目为x64,否则会提示找不到windows.h
+        * 打开ctp_c\\ctp.sln
+        * 编译ctp_quote 和 ctp_trade项目
+        * 编译后生成的dll放在<red>py_ctp\lib32|lib64</red>目录下
+    * Linux
+        * 设置系统语言为：zh_CN.UTF-8
+        * 复制文件到linux ctp_c\\*.h *.cpp 到ctp_c目录下
+        * 复制 ctp_20180109\\*.so到dll目录下
+        * 复制 py_ctp\\*.py到py_ctp目录下
+        * 进入dll目录，执行以下指令
+            * g++ -shared -fPIC -o ./ctp_trade.so ./trade.cpp ./libUSTPtraderapiAF.so
+            * g++ -shared -fPIC ./quote.cpp -o ./ctp_quote.so ./libUSTPmduserapiAF.so
+* 测试
+    * Python
+        * 安装 `pip install py_ctp`
+        * 测试代码 https://pypi.org/project/py-ctp/
+    * C#
+        * `copy cs_ctp\*.cs cs_ctp\ctp_test\`
+        * 打开cs_ctp\ctp_test 项目进行调试
+        * 打开cs_ctp\proxytest 项目测试.net封装
 
-#### 安装教程
-
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 使用说明
-
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 参与贡献
-
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
-
-
-#### 码云特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  码云官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解码云上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是码云最有价值开源项目，是码云综合评定出的优秀开源项目
-5.  码云官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  码云封面人物是一档用来展示码云会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
