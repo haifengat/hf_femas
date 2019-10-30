@@ -35,10 +35,13 @@ class CtpQuote(object):
         self.q.OnRspUserLogin = self._OnRspUserLogin
         self.q.OnRtnDepthMarketData = self._OnRtnDepthMarketData
         self.q.OnRspSubMarketData = self._OnRspSubMarketData
+        self.q.OnPackageStart = lambda x, y: x
+        self.q.OnPackageEnd = lambda x, y: x
 
         self.q.RegCB()
 
         self.q.RegisterFront(pAddress)
+        self.q.SubscribeMarketDataTopic(100, USTP_TE_RESUME_TYPE.USTP_TERT_RESTART)
         self.q.Init()
 
     def ReqUserLogin(self, user: str, pwd: str, broker: str):
@@ -83,7 +86,6 @@ class CtpQuote(object):
         info.ErrorID = pRspInfo.getErrorID()
         info.ErrorMsg = pRspInfo.getErrorMsg()
         self.logined = True
-        self.q.SubscribeMarketDataTopic(100, USTP_TE_RESUME_TYPE.USTP_TERT_QUICK)
         threading.Thread(target=self.OnUserLogin, args=(self, info)).start()
 
     def _OnRspSubMarketData(self, pSpecificInstrument: CUstpFtdcSpecificInstrumentField, pRspInfo: CUstpFtdcRspInfoField, nRequestID: int, bIsLast: bool):

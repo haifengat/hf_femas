@@ -58,8 +58,8 @@ class TestQuote(object):
 
         self.q = CtpQuote()
         self.q.OnConnected = lambda x: self.q.ReqUserLogin(self.investor, self.pwd, self.broker)
-        self.q.OnUserLogin = lambda o, i: self.q.ReqSubscribeMarketData('rb1910')
-        self.q.OnTick = lambda t: print(f'{t.LastPrice}, {t.Volume}\n')
+        self.q.OnUserLogin = lambda o, i: self.q.ReqSubscribeMarketData('IF1911')
+        self.q.OnTick = lambda q, t: print(f'{t.LastPrice}, {t.Volume}')
 
     def run(self):
         self.q.ReqConnect(self.front)
@@ -91,8 +91,6 @@ if __name__ == "__main__":
 
     qq = TestQuote(front_quote, broker, investor, pwd)
     qq.run()
-    if qq.q.logined:
-        qq.q.ReqSubscribeMarketData('IF1911')
     #
     # time.sleep(6)
     # for inst in tt.t.instruments.values():
