@@ -35,13 +35,13 @@ long_description_content_type = "text/markdown",  # 指定包文档格式为mark
 setup(
     name='py_femas',  # 包名
     python_requires='>=3.7.0',  # python环境
-    version='0.0.1',  # 包的版本
+    version='0.0.2',  # 包的版本
     description="Python Femas futures api",  # 包简介，显示在PyPI上
     long_description=long_description,  # 读取的Readme文档内容
     long_description_content_type=long_description_content_type,  # 指定包文档格式为markdown
     author="HaiFeng",  # 作者相关信息
     author_email='haifengat@vip.qq.com',
-    url='https://gitee.com/haifengat/hf_femas',
+    url='https://github.com/haifengat/hf_femas',
     # 指定包信息，还可以用find_packages()函数
     # packages=find_packages(),
     packages=['py_femas'],

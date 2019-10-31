@@ -14,7 +14,7 @@ import time
 
 
 class TestTrade(object):
-    def __init__(self, addr: str, broker: str, investor: str, user: str, pwd: str, appid: str, auth_code: str, proc: str):
+    def __init__(self, addr: str, broker: str, user: str, pwd: str, appid: str, auth_code: str, proc: str):
         self.front = addr
         self.broker = broker
         self.investor = user
@@ -23,7 +23,7 @@ class TestTrade(object):
         self.authcode = auth_code
         self.proc = proc
 
-        self.t = CtpTrade(investor)
+        self.t = CtpTrade()
         self.t.OnConnected = self.on_connect
         self.t.OnUserLogin = lambda o, x: print('Trade logon:', x)
         self.t.OnDisConnected = lambda o, x: print(x)
@@ -83,10 +83,10 @@ if __name__ == "__main__":
         appid = input('appid:')
         auth_code = input('auth code:')
         proc = input('product info:')
-    tt = TestTrade(front_trade, broker, investor[:-1], investor, pwd, appid, auth_code, proc)
+    tt = TestTrade(front_trade, broker, investor, pwd, appid, auth_code, proc)
     tt.run()
     time.sleep(5)
-    if tt.t.logined:
+    if tt.t.is_login:
         tt.t.ReqOrderInsert('IF1911', DirectType.Buy, OffsetType.Open, 3885, 3)
 
     qq = TestQuote(front_quote, broker, investor, pwd)

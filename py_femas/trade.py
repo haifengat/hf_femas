@@ -10,8 +10,8 @@ import threading
 import itertools
 import time
 
-from .enums import OrderType, InstrumentStatus, DirectType, OffsetType, HedgeType, TradeTypeType
-from .structs import InfoField, InstrumentField, OrderField, OrderStatus, PositionField, TradeField, TradingAccount, PositionDetail
+from .enums import OrderType, InstrumentStatus, DirectType, OffsetType
+from .structs import InfoField, InstrumentField, OrderField, OrderStatus, PositionField, TradeField, TradingAccount
 from .ctp_trade import Trade
 from .ctp_struct import *
 from .ctp_enum import *
@@ -20,11 +20,12 @@ from .ctp_enum import *
 class CtpTrade():
     """"""
 
-    def __init__(self, investorid: str):
+    def __init__(self):
         self.front_address = ''
+        '''前置地址'''
         self.user_id = ''
         '''登录帐号'''
-        self.account_id = investorid
+        self.investor_id = ''
         '''资金帐号'''
         self.password = ''
         self.broker = ''
@@ -32,8 +33,10 @@ class CtpTrade():
         '''公网IP'''
         self.port = ''
         '''公网端口'''
-        self.logined = False
+        self.is_login = False
+        '''登录成功'''
         self.tradingday = ''
+        '''交易日'''
 
         self.instruments = {}
         self.orders = {}
@@ -53,7 +56,7 @@ class CtpTrade():
         threading.Thread(target=self.OnConnected, args=(self,)).start()
 
     def _OnFrontDisconnected(self, nReason):
-        self.logined = False
+        self.is_login = False
         print(nReason)
         # 下午收盘后会不停断开再连接 4097错误
         if nReason == 4097 or nReason == 4098:
@@ -86,10 +89,9 @@ class CtpTrade():
             self.session = pRspUserLogin.getMaxOrderLocalID()
             self._req = int(self.session) if self.session.isdigit() else 0
             self.tradingday = pRspUserLogin.getTradingDay()
-            if not self.logined:
-                time.sleep(0.5)
-                self.t.ReqQryInstrument()
-        elif self.logined:
+            if not self.is_login:
+                self.t.ReqQryUserInvestor(self.broker, self.user_id)
+        elif self.is_login:
             threading.Thread(target=self._relogin).start()
         else:
             info = InfoField()
@@ -105,6 +107,12 @@ class CtpTrade():
             UserID=self.user_id,
             Password=self.password,
             UserProductInfo='@haifeng')
+
+    def _OnRspUserInvestor(self, pRspUserInvestor: CUstpFtdcRspUserInvestorField, pRspInfo: CUstpFtdcRspInfoField, nRequestID: int, bIsLast: bool):
+        """查资金帐号"""
+        self.investor_id = pRspUserInvestor.getInvestorID()
+        time.sleep(1.1)
+        self.t.ReqQryInstrument()
 
     def _qry(self):
         """查询帐号相关信息"""
@@ -123,17 +131,17 @@ class CtpTrade():
         self.t.ReqQryInvestorAccount(self.broker, self.user_id)
         time.sleep(1.1)
 
-        self.logined = True
+        self.is_login = True
         info = InfoField()
         info.ErrorID = 0
         info.ErrorMsg = '正确'
         threading.Thread(target=self.OnUserLogin, args=(self, info)).start()
         # 调用Release后程序异常退出,但不报错误:接口断开了仍然调用了查询指令
-        while self.logined:
+        while self.is_login:
             """查询持仓与权益"""
             self.t.ReqQryInvestorPosition(self.broker, self.user_id)
             time.sleep(1.1)
-            if not self.logined:
+            if not self.is_login:
                 return
             self.t.ReqQryInvestorAccount(self.broker, self.user_id)
             time.sleep(1.1)
@@ -244,7 +252,7 @@ class CtpTrade():
             of.OrderID = id
             of.Volume = pOrder.getVolume()
             of.VolumeLeft = of.Volume
-            if not self.logined:  # 旧order
+            if not self.is_login:  # 旧order
                 s = pOrder.getOrderStatus()
                 if s == TUstpFtdcOrderStatusType.USTP_FTDC_OS_AllTraded:
                     of.Status = OrderStatus.Filled
@@ -390,7 +398,7 @@ class CtpTrade():
 
     def _OnRspOrderAction(self, pOrderAction: CUstpFtdcOrderActionField, pRspInfo: CUstpFtdcRspInfoField, nRequestID: int, bIsLast: bool):
         id = pOrderAction.getUserOrderLocalID()
-        if self.logined and id in self.orders:
+        if self.is_login and id in self.orders:
             info = InfoField()
             info.ErrorID = pRspInfo.getErrorID()
             info.ErrorMsg = pRspInfo.getErrorMsg()
@@ -416,6 +424,7 @@ class CtpTrade():
 
         self.t.OnFrontConnected = self._OnFrontConnected
         self.t.OnRspUserLogin = self._OnRspUserLogin
+        self.t.OnRspQryUserInvestor = self._OnRspUserInvestor
         self.t.OnRspDSUserCertification = self._OnRspAuthenticate
         self.t.OnFrontDisconnected = self._OnFrontDisconnected
         # self.t.OnRspUserLogout = self._OnRspUserLogout
@@ -499,7 +508,7 @@ class CtpTrade():
             BrokerID=self.broker,
             # InvestorID=self.investor,
             InstrumentID=pInstrument,
-            InvestorID=self.account_id,
+            InvestorID=self.investor_id,
             UserID=self.user_id,
             UserCustom=f'{pCustom}',
             UserOrderLocalID=f'{self._req:013d}',
@@ -530,11 +539,11 @@ class CtpTrade():
         else:
             pOrderId = of.OrderID
             self._req += 1
-            return self.t.ReqOrderAction(InvestorID=self.account_id, BrokerID=self.broker, UserID=self.user_id, ExchangeID=of.ExchangeID, OrderSysID=of.SysID, UserOrderLocalID=of.OrderID, UserOrderActionLocalID=f'{self._req:013d}', ActionFlag=TUstpFtdcActionFlagType.USTP_FTDC_AF_Delete)
+            return self.t.ReqOrderAction(InvestorID=self.investor_id, BrokerID=self.broker, UserID=self.user_id, ExchangeID=of.ExchangeID, OrderSysID=of.SysID, UserOrderLocalID=of.OrderID, UserOrderActionLocalID=f'{self._req:013d}', ActionFlag=TUstpFtdcActionFlagType.USTP_FTDC_AF_Delete)
 
     def ReqUserLogout(self):
         """退出接口"""
-        self.logined = False
+        self.is_login = False
         time.sleep(3)
         self.t.ReqUserLogout(BrokerID=self.broker, UserID=self.user_id)
         self.t.RegisterSpi(None)
