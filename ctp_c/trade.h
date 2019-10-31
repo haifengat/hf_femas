@@ -19,7 +19,7 @@
 #ifdef WIN32
 #define WINAPI      __cdecl
 #include "../win32/USTPFtdcTraderApi.h"
-#pragma comment(lib, "../win32/libUSTPtraderapiAF.lib")
+#pragma comment(lib, "../win32/USTPtraderapiAF.lib")
 #else
 #define WINAPI      __stdcall
 #include "../win64/USTPFtdcTraderApi.h"

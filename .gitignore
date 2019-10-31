@@ -116,3 +116,5 @@ dmypy.json
 .idea/
 .vs/
 Debug
+log/
+/ctp_c/ctp_quote.vcxproj.user

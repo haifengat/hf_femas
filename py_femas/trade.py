@@ -370,14 +370,23 @@ class CtpTrade():
         id = pInputOrder.getUserOrderLocalID()
         of = self.orders.get(id)
 
-        info = InfoField()
-        info.ErrorID = pRspInfo.getErrorID()
-        info.ErrorMsg = pRspInfo.getErrorMsg()
-
         if of and of.IsLocal:
+            info = InfoField()
+            info.ErrorID = pRspInfo.getErrorID()
+            info.ErrorMsg = pRspInfo.getErrorMsg()
             of.Status = OrderStatus.Error
             of.StatusMsg = '{0}:{1}'.format(pRspInfo.getErrorID(), pRspInfo.getErrorMsg())
             threading.Thread(target=self.OnErrOrder, args=(self, of, info)).start()
+
+    def _OnErrCancel(self, pOrderAction: CUstpFtdcOrderActionField, pRspInfo: CUstpFtdcRspInfoField):
+        """撤单错误"""
+        id = pOrderAction.getUserOrderLocalID()
+        of = self.orders.get(id)
+        if of and of.IsLocal:
+            info = InfoField()
+            info.ErrorID = pRspInfo.getErrorID()
+            info.ErrorMsg = pRspInfo.getErrorMsg()
+            threading.Thread(target=self.OnErrCancel, args=(self, of, info)).start()
 
     def _OnRspOrderAction(self, pOrderAction: CUstpFtdcOrderActionField, pRspInfo: CUstpFtdcRspInfoField, nRequestID: int, bIsLast: bool):
         id = pOrderAction.getUserOrderLocalID()
@@ -421,6 +430,7 @@ class CtpTrade():
         self.t.OnRspQryInvestorPosition = self._OnRspQryPosition
         self.t.OnRtnQuote = self._OnRtnQuote
         self.t.OnErrRtnQuoteInsert = self._OnErrRtnQuote
+        self.t.OnErrRtnOrderAction = self._OnErrCancel
 
         self.t.OnRtnMarginCombinationLeg = lambda x: x
         self.t.OnPackageEnd = lambda x, y: x
@@ -519,7 +529,8 @@ class CtpTrade():
             return -1
         else:
             pOrderId = of.OrderID
-            return self.t.ReqOrderAction(BrokerID=self.broker, UserID=self.user_id, ExchangeID=of.ExchangeID, OrderSysID=of.SysID, ActionFlag=TUstpFtdcActionFlagType.USTP_FTDC_AF_Delete)
+            self._req += 1
+            return self.t.ReqOrderAction(InvestorID=self.account_id, BrokerID=self.broker, UserID=self.user_id, ExchangeID=of.ExchangeID, OrderSysID=of.SysID, UserOrderLocalID=of.OrderID, UserOrderActionLocalID=f'{self._req:013d}', ActionFlag=TUstpFtdcActionFlagType.USTP_FTDC_AF_Delete)
 
     def ReqUserLogout(self):
         """退出接口"""
