@@ -84,7 +84,7 @@ class CtpTrade():
         """"""
         if pRspInfo.getErrorID() == 0:
             self.session = pRspUserLogin.getMaxOrderLocalID()
-            self._req = int(self.session)
+            self._req = int(self.session) if self.session.isdigit() else 0
             self.tradingday = pRspUserLogin.getTradingDay()
             if not self.logined:
                 time.sleep(0.5)
