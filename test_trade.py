@@ -86,7 +86,7 @@ if __name__ == "__main__":
     tt = TestTrade(front_trade, broker, investor, pwd, appid, auth_code, proc)
     tt.run()
     time.sleep(5)
-    if tt.t.is_login:
+    if tt.t.logined:
         tt.t.ReqOrderInsert('IF1911', DirectType.Buy, OffsetType.Open, 3885, 3)
 
     qq = TestQuote(front_quote, broker, investor, pwd)

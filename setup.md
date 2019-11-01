@@ -7,10 +7,13 @@
 ```python
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-__title__ = 'test py femas of se'
+__title__ = 'test py ctp of se'
 __author__ = 'HaiFeng'
-__mtime__ = '20191031'
+__mtime__ = '20190506'
 
+import sys
+
+sys.path.append('.')
 from py_femas.trade import CtpTrade
 from py_femas.quote import CtpQuote
 from py_femas.enums import *
@@ -18,10 +21,10 @@ import time
 
 
 class TestTrade(object):
-    def __init__(self, addr: str, broker: str, investor: str, pwd: str, appid: str, auth_code: str, proc: str):
+    def __init__(self, addr: str, broker: str, user: str, pwd: str, appid: str, auth_code: str, proc: str):
         self.front = addr
         self.broker = broker
-        self.investor = investor
+        self.investor = user
         self.pwd = pwd
         self.appid = appid
         self.authcode = auth_code
@@ -34,9 +37,9 @@ class TestTrade(object):
         self.t.OnRtnNotice = lambda obj, time, msg: print(f'OnNotice: {time}:{msg}')
         self.t.OnErrRtnQuote = lambda obj, quote, info: None
         self.t.OnErrRtnQuoteInsert = lambda obj, o: None
-        self.t.OnOrder = lambda obj, o: None
-        self.t.OnErrOrder = lambda obj, f, info: None
-        self.t.OnTrade = lambda obj, o: None
+        self.t.OnOrder = lambda obj, o: print(o)
+        self.t.OnErrOrder = lambda obj, f, info: print(info)
+        self.t.OnTrade = lambda obj, o: print(o)
         self.t.OnInstrumentStatus = lambda obj, inst, stat: None
 
     def on_connect(self, obj):
@@ -62,7 +65,8 @@ class TestQuote(object):
 
         self.q = CtpQuote()
         self.q.OnConnected = lambda x: self.q.ReqUserLogin(self.investor, self.pwd, self.broker)
-        self.q.OnUserLogin = lambda o, i: self.q.ReqSubscribeMarketData('rb1910')
+        self.q.OnUserLogin = lambda o, i: self.q.ReqSubscribeMarketData('IF1911')
+        self.q.OnTick = lambda q, t: print(f'{t.LastPrice}, {t.Volume}')
 
     def run(self):
         self.q.ReqConnect(self.front)
@@ -77,8 +81,8 @@ if __name__ == "__main__":
     broker = '0137'
     investor = ''
     pwd = ''
-    appid = ''
-    auth_code = ''
+    appid = 'client_LB_1.0'
+    auth_code = 'Q5V2UZ1G6AB2QC'
     proc = ''
     if investor == '':
         investor = input('invesotr:')
@@ -89,12 +93,12 @@ if __name__ == "__main__":
     tt = TestTrade(front_trade, broker, investor, pwd, appid, auth_code, proc)
     tt.run()
     time.sleep(5)
-    # tt.t.ReqOrderInsert('j1905', DirectType.Buy, OffsetType.Open, 2060, 3)
+    if tt.t.logined:
+        tt.t.ReqOrderInsert('IF1911', DirectType.Buy, OffsetType.Open, 3885, 3)
 
-    time.sleep(3)
     qq = TestQuote(front_quote, broker, investor, pwd)
     qq.run()
-
+    #
     # time.sleep(6)
     # for inst in tt.t.instruments.values():
     #     print(inst)

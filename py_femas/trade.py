@@ -25,15 +25,13 @@ class CtpTrade():
         '''前置地址'''
         self.user_id = ''
         '''登录帐号'''
-        self.investor_id = ''
-        '''资金帐号'''
         self.password = ''
         self.broker = ''
         self.pub_ip = ''
         '''公网IP'''
         self.port = ''
         '''公网端口'''
-        self.is_login = False
+        self.logined = False
         '''登录成功'''
         self.tradingday = ''
         '''交易日'''
@@ -45,6 +43,8 @@ class CtpTrade():
         self.positions = {}
         self.instrument_status = {}
 
+        self._investor_id = ''
+        '''资金帐号'''
         self._req = 0
         self._session = ''
         self._orderid_sysid = {}
@@ -56,7 +56,7 @@ class CtpTrade():
         threading.Thread(target=self.OnConnected, args=(self,)).start()
 
     def _OnFrontDisconnected(self, nReason):
-        self.is_login = False
+        self.logined = False
         print(nReason)
         # 下午收盘后会不停断开再连接 4097错误
         if nReason == 4097 or nReason == 4098:
@@ -89,9 +89,9 @@ class CtpTrade():
             self.session = pRspUserLogin.getMaxOrderLocalID()
             self._req = int(self.session) if self.session.isdigit() else 0
             self.tradingday = pRspUserLogin.getTradingDay()
-            if not self.is_login:
+            if not self.logined:
                 self.t.ReqQryUserInvestor(self.broker, self.user_id)
-        elif self.is_login:
+        elif self.logined:
             threading.Thread(target=self._relogin).start()
         else:
             info = InfoField()
@@ -110,7 +110,7 @@ class CtpTrade():
 
     def _OnRspUserInvestor(self, pRspUserInvestor: CUstpFtdcRspUserInvestorField, pRspInfo: CUstpFtdcRspInfoField, nRequestID: int, bIsLast: bool):
         """查资金帐号"""
-        self.investor_id = pRspUserInvestor.getInvestorID()
+        self._investor_id = pRspUserInvestor.getInvestorID()
         time.sleep(1.1)
         self.t.ReqQryInstrument()
 
@@ -131,19 +131,20 @@ class CtpTrade():
         self.t.ReqQryInvestorAccount(self.broker, self.user_id)
         time.sleep(1.1)
 
-        self.is_login = True
+        self.logined = True
         info = InfoField()
         info.ErrorID = 0
         info.ErrorMsg = '正确'
         threading.Thread(target=self.OnUserLogin, args=(self, info)).start()
         # 调用Release后程序异常退出,但不报错误:接口断开了仍然调用了查询指令
-        while self.is_login:
+        while self.logined:
             """查询持仓与权益"""
-            self.t.ReqQryInvestorPosition(self.broker, self.user_id)
+            self.t.ReqQryInvestorPosition(self.broker, self.user_id, InvestorID=self._investor_id)
             time.sleep(1.1)
-            if not self.is_login:
+            print('p')
+            if not self.logined:
                 return
-            self.t.ReqQryInvestorAccount(self.broker, self.user_id)
+            self.t.ReqQryInvestorAccount(self.broker, self.user_id, self._investor_id)
             time.sleep(1.1)
 
     def _OnRtnInstrumentStatus(self, pInstrumentStatus: CUstpFtdcInstrumentStatusField):
@@ -182,11 +183,10 @@ class CtpTrade():
         if pInvestorPosition.getInstrumentID() != '':  # 偶尔出现NULL的数据导致数据转换错误
             self._posi.append(pInvestorPosition)  # Struct(**f.__dict__)) #dict -> object
 
-        if bIsLast:
-            # 先排序再group才有效
-            self._posi = sorted(self._posi, key=lambda c: '{0}_{1}'.format(c.getInstrumentID(), DirectType.Buy if c.getPosiDirection() == TUstpFtdcDirectionType.USTP_FTDC_D_Buy else DirectType.Sell))
+        if bIsLast:  # 先排序再group才有效
+            self._posi = sorted(self._posi, key=lambda c: '{0}_{1}'.format(c.getInstrumentID(), DirectType.Buy if c.getDirection() == TUstpFtdcDirectionType.USTP_FTDC_D_Buy else DirectType.Sell))
             # direction需从posidiction转换为dictiontype
-            for key, group in itertools.groupby(self._posi, lambda c: '{0}_{1}'.format(c.getInstrumentID(), 'Buy' if c.getPosiDirection() == TUstpFtdcDirectionType.USTP_FTDC_D_Buy else 'Sell')):
+            for key, group in itertools.groupby(self._posi, lambda c: '{0}_{1}'.format(c.getInstrumentID(), 'Buy' if c.getDirection() == TUstpFtdcDirectionType.USTP_FTDC_D_Buy else 'Sell')):
                 pf = self.positions.get(key)
                 if not pf:
                     pf = PositionField()
@@ -203,16 +203,15 @@ class CtpTrade():
                 for g in group:
                     if not pf.InstrumentID:
                         pf.InstrumentID = g.getInstrumentID()
-                        pf.Direction = DirectType.Buy if g.getPosiDirection() == TUstpFtdcDirectionType.USTP_FTDC_D_Buy else DirectType.Sell
+                        pf.Direction = DirectType.Buy if g.getDirection() == TUstpFtdcDirectionType.USTP_FTDC_D_Buy else DirectType.Sell
                     pf.Position += g.getPosition()
-                    pf.TdPosition += g.getTodayPosition()
-                    pf.YdPosition = pf.Position - pf.TdPosition
-                    pf.CloseProfit += g.getCloseProfit()
-                    pf.PositionProfit += g.getPositionProfit()
-                    pf.Commission += g.getCommission()
-                    pf.Margin += g.getUseMargin()
-                    cost += g.OpenCost
-                # pf.Position <= 0 ? 0 : (g.Sum(n => n.PositionCost) / DicInstrumentField[pf.InstrumentID].VolumeMultiple / pf.Position);
+                    pf.YdPosition = g.getYdPosition()
+                    pf.TdPosition += pf.Position - pf.YdPosition
+                    pf.CloseProfit += 0
+                    pf.PositionProfit += 0
+                    pf.Commission += 0
+                    pf.Margin += g.getUsedMargin()
+                    cost += g.getPositionCost()
                 if pf.InstrumentID in self.instruments:
                     vm = self.instruments[pf.InstrumentID].VolumeMultiple
                     pf.Price = 0 if pf.Position <= 0 else (cost / (vm if vm > 0 else 1) / pf.Position)
@@ -252,7 +251,7 @@ class CtpTrade():
             of.OrderID = id
             of.Volume = pOrder.getVolume()
             of.VolumeLeft = of.Volume
-            if not self.is_login:  # 旧order
+            if not self.logined:  # 旧order
                 s = pOrder.getOrderStatus()
                 if s == TUstpFtdcOrderStatusType.USTP_FTDC_OS_AllTraded:
                     of.Status = OrderStatus.Filled
@@ -270,7 +269,7 @@ class CtpTrade():
             threading.Thread(target=self.OnOrder, args=(self, of)).start()
         elif pOrder.getOrderStatus() == TUstpFtdcOrderStatusType.USTP_FTDC_OS_Canceled:
             of.Status = OrderStatus.Canceled
-            of.StatusMsg = pOrder.getStatusMsg()
+            # of.StatusMsg = pOrder.getStatusMsg() 飞马没有此函数
 
             if of.StatusMsg.find('被拒绝') >= 0:
                 info = InfoField()
@@ -360,18 +359,19 @@ class CtpTrade():
             of.Direction = DirectType.Buy if pInputOrder.getDirection() == TUstpFtdcDirectionType.USTP_FTDC_D_Buy else DirectType.Sell
             ot = pInputOrder.getOffsetFlag()
             of.Offset = OffsetType.Open if ot == TUstpFtdcOffsetFlagType.USTP_FTDC_OF_Open else OffsetType.CloseToday if ot == TUstpFtdcOffsetFlagType.USTP_FTDC_OF_CloseToday else OffsetType.Close
-            # of.Status = OrderStatus.Normal
-            # of.StatusMsg = f.getStatusMsg()
+            of.ExchangeID = pInputOrder.getExchangeID()
+            of.Status = OrderStatus.Normal
+            of.StatusMsg = '报单已提交'
             of.IsLocal = True
             of.LimitPrice = pInputOrder.getLimitPrice()
             of.OrderID = id
             of.Volume = pInputOrder.getVolume()
             of.VolumeLeft = of.Volume
             self.orders[id] = of
-
-        of.Status = OrderStatus.Error
-        of.StatusMsg = '{0}:{1}'.format(info.ErrorID, info.ErrorMsg)
-        threading.Thread(target=self.OnErrOrder, args=(self, of, info)).start()
+        if info.ErrorID != 0:
+            of.Status = OrderStatus.Error
+            of.StatusMsg = '{0}:{1}'.format(info.ErrorID, info.ErrorMsg)
+            threading.Thread(target=self.OnErrOrder, args=(self, of, info)).start()
 
     def _OnErrOrder(self, pInputOrder: CUstpFtdcInputOrderField, pRspInfo: CUstpFtdcRspInfoField):
         """"""
@@ -398,7 +398,7 @@ class CtpTrade():
 
     def _OnRspOrderAction(self, pOrderAction: CUstpFtdcOrderActionField, pRspInfo: CUstpFtdcRspInfoField, nRequestID: int, bIsLast: bool):
         id = pOrderAction.getUserOrderLocalID()
-        if self.is_login and id in self.orders:
+        if self.logined and id in self.orders:
             info = InfoField()
             info.ErrorID = pRspInfo.getErrorID()
             info.ErrorMsg = pRspInfo.getErrorMsg()
@@ -508,7 +508,7 @@ class CtpTrade():
             BrokerID=self.broker,
             # InvestorID=self.investor,
             InstrumentID=pInstrument,
-            InvestorID=self.investor_id,
+            InvestorID=self._investor_id,
             UserID=self.user_id,
             UserCustom=f'{pCustom}',
             UserOrderLocalID=f'{self._req:013d}',
@@ -539,11 +539,11 @@ class CtpTrade():
         else:
             pOrderId = of.OrderID
             self._req += 1
-            return self.t.ReqOrderAction(InvestorID=self.investor_id, BrokerID=self.broker, UserID=self.user_id, ExchangeID=of.ExchangeID, OrderSysID=of.SysID, UserOrderLocalID=of.OrderID, UserOrderActionLocalID=f'{self._req:013d}', ActionFlag=TUstpFtdcActionFlagType.USTP_FTDC_AF_Delete)
+            return self.t.ReqOrderAction(InvestorID=self._investor_id, BrokerID=self.broker, UserID=self.user_id, ExchangeID=of.ExchangeID, OrderSysID=of.SysID, UserOrderLocalID=of.OrderID, UserOrderActionLocalID=f'{self._req:013d}', ActionFlag=TUstpFtdcActionFlagType.USTP_FTDC_AF_Delete)
 
     def ReqUserLogout(self):
         """退出接口"""
-        self.is_login = False
+        self.logined = False
         time.sleep(3)
         self.t.ReqUserLogout(BrokerID=self.broker, UserID=self.user_id)
         self.t.RegisterSpi(None)
